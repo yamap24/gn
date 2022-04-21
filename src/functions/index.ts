@@ -1,0 +1,1 @@
+export {default as generateReleaseNote} from './pull-notionDB';
