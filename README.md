@@ -2,11 +2,19 @@
 gn is a tool to generate Notion database items from GitHub Pull Requests.
 
 ## Setup
-### 1. Get GitHub Credentials
+### 1. Get GitHub Personal Token
+1. Open your personal tokens page(https://github.com/settings/tokens)
+2. Generate your token that have your repo read scope. (If your repo is private , you should check the admin.org.read:org.)
+
 ### 2. Integrate Notion app on your Notion
+1. Open your notion integrations(https://www.notion.so/my-integrations)
+2. Create New Integration (You should check all content capabilities in Capabilities section.)
+3. Get your notion token.
+
+
 ### 3. Set your credentials
 
-> CAUTION: This process is only need if you execute on your local environment.
+> This process is only need if you execute on your local environment.
 
 Create `.env` file and write your credentials and settings for Notion and GitHub.
 ```dotenv
