@@ -52,6 +52,6 @@ const fetchMergedPulls = async (page): Promise<Array<PullRequest>> => {
 
 const isOneWeekAgo = (date: string): boolean => {
     let oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - process.env.GITHUB_PULL_SEARCH_SPAN);
     return Date.parse(date) >= oneWeekAgo.getTime();
 }

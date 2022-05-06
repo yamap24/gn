@@ -10,6 +10,8 @@ const serverlessConfiguration: AWS = {
   provider: {
     name: 'aws',
     runtime: 'nodejs14.x',
+    region: 'ap-northeast-1',
+    stage: 'prod',
     environment: {
       NODE_OPTIONS: '--enable-source-maps --stack-trace-limit=1000',
     },

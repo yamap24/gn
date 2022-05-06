@@ -1,60 +1,23 @@
-import {Client} from '@notionhq/client';
-import {QueryDatabaseResponse} from "@notionhq/client/build/src/api-endpoints";
-import {
-    NotionRequestBuilder
-} from "@functions/pull-notionDB/builder/notionRequestBuilder";
+import {Octokit} from '@octokit/core';
 
-const notion = new Client({auth: process.env.NOTION_API_KEY});
-const fetchUrlQuery = {
-    database_id: process.env.NOTION_PULLS_DATABASE_ID,
-    page_size: 100,
-    filter: {
-        or: [{
-            property: process.env.NOTION_MERGED_AT_KEY,
-            date: {past_week: {}}
-        }],
-    }
-}
+const octokit = new Octokit({auth: process.env.GITHUB_TOKEN});
 
-export const createNotionDatabaseItem = async (pull, notionUserList) => {
-    const builder = new NotionRequestBuilder(pull, notionUserList);
-    const requestBody = builder.createRequestBody();
-
-    try {
-        await notion.pages.create(requestBody);
-        console.log('[SUCCESS] created notion database item');
-    } catch (e) {
-        console.error('NotionDB ERROR: ', e);
-        throw e;
-    }
-}
-
-export const fetchUrlsInAWeek = async (): Promise<string[]> => {
+export const fetchAllMergedPullsInAWeek = async (): Promise<PullRequest[]> => {
+    let page = 1;
     let end = false;
-    const firstResponse = await notion.databases.query(fetchUrlQuery);
-    let allResults = firstResponse.results.map(r => {
-        return r.properties[process.env.NOTION_URL_KEY].url
-    });
+    let allResults = [];
 
-    if (!firstResponse.has_more) {
-        return allResults;
-    }
-
-    let startCursor = firstResponse.next_cursor;
     while (!end) {
         try {
-            const response = await notion.databases.query({...fetchUrlQuery, start_cursor: startCursor});
-            const result = response.results.map(r => {
-                return r.properties[process.env.NOTION_URL_KEY].url
-            });
-            allResults = allResults.concat(result);
+            const res = await fetchMergedPulls(page);
 
-            if (!response.has_more) {
+            if (res.length === 0) {
                 end = true;
                 continue;
             }
 
-            startCursor = response.next_cursor;
+            allResults = allResults.concat(res);
+            page++;
         } catch (error) {
             end = true;
         }
@@ -63,17 +26,32 @@ export const fetchUrlsInAWeek = async (): Promise<string[]> => {
     return allResults;
 }
 
-export const fetchNotionUserList = async (): Promise<User[]> => {
-    try {
-        const response: QueryDatabaseResponse = await notion.databases.query({database_id: process.env.NOTION_USER_DATABASE_ID});
+const fetchMergedPulls = async (page): Promise<Array<PullRequest>> => {
+    return await octokit.request(`GET /repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/pulls`, {
+        owner: process.env.GITHUB_OWNER,
+        repo: process.env.GITHUB_REPO,
+        state: 'closed',
+        sort: 'created',
+        direction: 'desc',
+        page: page,
+        per_page: 50,
+    }).then(results => results.data.filter(r => isOneWeekAgo(r.merged_at)).map(r => {
+        return {
+            title: r.title,
+            url: r.html_url,
+            description: r.body,
+            labels: r.labels.map(l => l.description),
+            mergedAt: r.merged_at,
+            assignee: r.user.login,
+        };
+    })).catch(e => {
+        console.error('Github Fetch Pull Error: ', e);
+        throw e;
+    });
+}
 
-        return response.results.map(r => {
-            const githubUser = r.properties['githubUserName'].rich_text.reduce((p, c) => p + c.text.content, "");
-            const notionUser = r.properties['notionUser'].people;
-
-            return {githubUser, notionUser}
-        });
-    } catch (error) {
-        console.error('Notion User List ERROR:', error);
-    }
+const isOneWeekAgo = (date: string): boolean => {
+    let oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - process.env.GITHUB_PULL_SEARCH_SPAN);
+    return Date.parse(date) >= oneWeekAgo.getTime();
 }
